@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ecnepsnai/crt/libs/zip"
+	"github.com/ecnepsnai/zip"
 	"github.com/fatih/color"
 )
 
