@@ -3,13 +3,11 @@ package console
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime/debug"
 	"sync"
 	"time"
 
-	"github.com/ecnepsnai/zip"
 	"github.com/fatih/color"
 )
 
@@ -76,29 +74,18 @@ func (l *Console) Rotate(destinationDir string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	destFileName := destinationDir + "/log." + time.Now().Format("2006-01-02") + ".zip"
+	destFileName := destinationDir + "/log." + time.Now().Format("2006-01-02")
 	l.Close()
 	l.file = nil
 
-	data, err := ioutil.ReadFile(l.filePath)
-	if err != nil {
-		fmt.Printf("%s\n", debug.Stack())
+	if err := os.Rename(l.config.Path, destFileName); err != nil {
+		fmt.Printf("Error rotating log file: %s\n", err.Error())
 		return err
 	}
 
-	archive, err := zip.NewZipFile(destFileName)
-	defer archive.Close()
+	newFile, err := newFile(l.config.Path)
 	if err != nil {
-		fmt.Printf("%s\n", debug.Stack())
-		return err
-	}
-
-	archive.AddFile("console.log", data)
-
-	os.Remove(l.filePath)
-	newFile, err := newFile(l.filePath)
-	if err != nil {
-		fmt.Printf("%s\n", debug.Stack())
+		fmt.Printf("Error rotating log file: %s\n", err.Error())
 		return err
 	}
 	l.file = newFile
