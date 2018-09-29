@@ -20,38 +20,48 @@ const (
 	LevelWarn = 1
 	// LevelError error messages for problems
 	LevelError = 0
+	// LevelNone no messages
+	LevelNone = -1
 )
 
 // Console describes a log object
 type Console struct {
-	Level    int
-	filePath string
-	file     *os.File
-	mutex    *sync.Mutex
+	config Config
+	file   *os.File
+	mutex  *sync.Mutex
 }
 
-// NewMemory create a new in-memory console instance that does not write to disk
-func NewMemory(level int) Console {
-	return Console{
-		mutex: &sync.Mutex{},
-		Level: level,
+// Config describes the configuration for a console session
+type Config struct {
+	// Path the path to where the log file should live.
+	// omit this to disable logging to a file.
+	Path string
+	// WriteLevel the log level that events must be at least before they
+	// are written to the log file.
+	WriteLevel int
+	// PrintLevel the log level that events must be at least before they
+	// are written to console.
+	PrintLevel int
+}
+
+// New create a new console instance with the provided config.
+func New(Config Config) (*Console, error) {
+	c := Console{
+		config: Config,
 	}
-}
+	if Config.Path == "" {
+		return &c, nil
+	}
 
-// New creates a new logging instance
-func New(logPath string, level int) (*Console, error) {
-	logFile, err := newFile(logPath)
+	logFile, err := newFile(Config.Path)
 	if err != nil {
 		return nil, err
 	}
 
-	l := Console{
-		filePath: logPath,
-		file:     logFile,
-		mutex:    &sync.Mutex{},
-		Level:    level,
-	}
-	return &l, nil
+	c.file = logFile
+	c.mutex = &sync.Mutex{}
+
+	return &c, nil
 }
 
 func newFile(logPath string) (*os.File, error) {
@@ -104,7 +114,7 @@ func (l *Console) write(message string) {
 		if err != nil {
 			// Try opening the file again
 			l.file.Close()
-			newFile, err := newFile(l.filePath)
+			newFile, err := newFile(l.config.Path)
 			if err != nil {
 				fmt.Printf("Error writing to log: %s", err.Error())
 			} else {
@@ -118,33 +128,41 @@ func (l *Console) write(message string) {
 // Debug print debug information to the console if verbose logging is enabled
 // Safe to call with sensitive data, but verbose logging should not be enabled on production instances
 func (l *Console) Debug(format string, a ...interface{}) {
-	if l.Level >= LevelDebug {
+	if l.config.PrintLevel >= LevelDebug {
 		fmt.Printf("%s %s\n", color.HiBlackString("[DEBUG]"), fmt.Sprintf(format, a...))
+	}
+	if l.config.WriteLevel >= LevelDebug {
 		l.write("[DEBUG] " + fmt.Sprintf(format, a...))
 	}
 }
 
 // Info print informational message to the console
 func (l *Console) Info(format string, a ...interface{}) {
-	if l.Level >= LevelInfo {
+	if l.config.PrintLevel >= LevelInfo {
 		fmt.Printf("%s %s\n", color.BlueString("[INFO] "), fmt.Sprintf(format, a...))
+	}
+	if l.config.WriteLevel >= LevelInfo {
 		l.write("[INFO]  " + fmt.Sprintf(format, a...))
 	}
 }
 
 // Warn print warning information to the console
 func (l *Console) Warn(format string, a ...interface{}) {
-	if l.Level >= LevelWarn {
+	if l.config.PrintLevel >= LevelWarn {
 		fmt.Printf("%s %s\n", color.YellowString("[WARN] "), fmt.Sprintf(format, a...))
+	}
+	if l.config.WriteLevel >= LevelWarn {
 		l.write("[WARN]  " + fmt.Sprintf(format, a...))
 	}
 }
 
 // Error print error information to the console
 func (l *Console) Error(format string, a ...interface{}) {
-	if l.Level >= LevelError {
-		stack := string(debug.Stack())
+	stack := string(debug.Stack())
+	if l.config.PrintLevel >= LevelWarn {
 		fmt.Printf("%s %s\n%s\n", color.RedString("[ERROR]"), fmt.Sprintf(format, a...), stack)
+	}
+	if l.config.WriteLevel >= LevelWarn {
 		l.write(fmt.Sprintf("[ERROR] %s\n%s", fmt.Sprintf(format, a...), stack))
 	}
 }
