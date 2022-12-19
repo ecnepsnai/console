@@ -1,3 +1,7 @@
+# Deprecated: please use github.com/ecnepsnai/logtic or something else.
+
+---
+
 # console
 A go console implementation
 
